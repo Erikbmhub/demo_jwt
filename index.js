@@ -1,32 +1,24 @@
+require("dotenv").config(); // Cargar variables de entorno
 const express = require("express"),
   jwt = require("jsonwebtoken"),
+  rutasProtegidas = require("./middlewares/rutasProtegidas"), // Importar middleware
   app = express();
 
-// Clave privada para firmar los Tokens
-// Guardar la clave en la BBDD
-const config = {
-  llave: "miclaveultrasecreta123*",
-};
+// Constante para la clave secreta
+const JWT_SECRET = process.env.JWT_SECRET || "miclaveultrasecreta123*";
 
 // 1
-app.set("llave", config.llave);
-
-// 2
 app.use(express.urlencoded({ extended: true }));
 
-// 3
+// 2
 app.use(express.json());
 
-app.listen(3000, () => {
-  console.log("Servidor iniciado en el puerto 3000");
-});
-
-// 4
+// 3
 app.get("/", function (req, res) {
   res.json({ message: "recurso de entrada" });
 });
 
-// 5
+// 4
 /* 
 POST /autenticar
 {
@@ -34,48 +26,33 @@ POST /autenticar
   "contrasena":"123456"
 } 
 */
+// Validación de entrada para el endpoint /autenticar
 app.post("/autenticar", (req, res) => {
-  if (req.body.usuario === "alex" && req.body.contrasena === "123456") {
+  const { usuario, contrasena } = req.body;
+
+  if (!usuario || !contrasena) {
+    return res.status(400).json({ success: false, message: "Faltan datos de usuario o contraseña" });
+  }
+
+  if (usuario === "alex" && contrasena === "123456") {
     const payload = {
       check: true,
       user: "alex",
-      password_banco: "123456",
     };
-    const token = jwt.sign(payload, app.get("llave"), {
-      expiresIn: "60000ms", // 30 segundos para que expire
+    const token = jwt.sign(payload, JWT_SECRET, { // Usar la constante JWT_SECRET
+      expiresIn: "60000ms", // 60 segundos para que expire
     });
-    res.json({
-      mensaje: "Autenticación correcta",
+    res.status(200).json({
+      success: true,
+      message: "Autenticación correcta",
       token: token,
     });
   } else {
-    res.json({ mensaje: "Usuario o contraseña incorrectos" });
+    res.status(401).json({ success: false, message: "Usuario o contraseña incorrectos" });
   }
 });
 
-// 6
-// Middleware para proteger la ruta /datos
-// Rellenar cabecera access-token en la petición de postman
-const rutasProtegidas = express.Router();
-rutasProtegidas.use((req, res, next) => {
-  const token = req.headers["access-token"];
-
-  if (token) {
-    jwt.verify(token, app.get("llave"), (err, decoded) => {
-      if (err) {
-        return res.json({ mensaje: "Token inválida" });
-      } else {
-        req.decoded = decoded;
-        next();
-      }
-    });
-  } else {
-    res.send({
-      mensaje: "Token no proveída.",
-    });
-  }
-});
-
+// Se aplica Middleware para proteger la ruta/datos
 app.get("/datos", rutasProtegidas, (req, res) => {
   // Consulta a la "BBDD"
   const datos = [
@@ -84,5 +61,15 @@ app.get("/datos", rutasProtegidas, (req, res) => {
     { id: 3, nombre: "Alvaru" },
   ];
 
-  res.json(datos);
+  res.status(200).json(datos);
+});
+
+// Middleware para manejar errores genéricos
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ success: false, message: "Error interno del servidor" });
+});
+
+app.listen(3000, () => {
+  console.log("Servidor iniciado en http://localhost:3000");
 });
