@@ -27,6 +27,7 @@ POST /autenticar
 } 
 */
 // Validación de entrada para el endpoint /autenticar
+//Consulta a base de datos
 app.post("/autenticar", (req, res) => {
   const { usuario, contrasena } = req.body;
 
